@@ -11,6 +11,7 @@ init_db()
 
 from backend.api import nodes as nodes_router
 from backend.api import experiment as experiment_router
+from backend.api import export as export_router
 from backend.api import sessions as sessions_router
 from backend.api import turns as turns_router
 
@@ -45,6 +46,7 @@ app.include_router(sessions_router.router)
 app.include_router(turns_router.router)
 app.include_router(nodes_router.router)
 app.include_router(experiment_router.router)
+app.include_router(export_router.router)
 
 
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"

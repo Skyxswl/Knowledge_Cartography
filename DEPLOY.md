@@ -6,7 +6,7 @@
 
 1. 把仓库推到 GitHub。
 2. 在 Render 新建 Blueprint，选择这个仓库。
-3. Render 会读取 `render.yaml`，用 Docker 构建并启动服务。
+3. Render 会读取 `render.yaml`，用 Docker 构建并启动免费 Web Service。
 4. 默认使用你当前的 MiniMax 配置。Render 会要求你手动填写 `ZOOMMIND_LLM_API_KEY`，不要把 key 写进仓库。
 
 ## MiniMax 配置
@@ -25,13 +25,22 @@ ZOOMMIND_LLM_REASONING_SPLIT=true
 
 ## 数据保存
 
-`render.yaml` 已配置持久化磁盘：
+当前 `render.yaml` 使用免费方案：
 
 ```text
-DATABASE_URL=sqlite:////data/app.db
+DATABASE_URL=sqlite:///./app.db
 ```
 
-远程实验日志、状态快照、对话和图谱都会写入这个 SQLite 文件。注意：如果删除 Render 服务或磁盘，数据也会丢失。
+远程实验日志、状态快照、对话和图谱会写入服务内的 SQLite 文件。免费 Render 不提供 persistent disk，服务重启、休眠唤醒或重新部署后数据可能丢失。
+
+每轮远程测试结束后，立刻导出数据：
+
+```text
+https://你的-render-url.onrender.com/api/export
+https://你的-render-url.onrender.com/api/export/events.csv
+```
+
+`/api/export` 返回完整 JSON，适合备份。`/api/export/events.csv` 返回行为日志 CSV，适合快速分析。
 
 ## 本地生产模式验证
 

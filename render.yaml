@@ -2,14 +2,10 @@ services:
   - type: web
     name: zoommind
     runtime: docker
-    plan: starter
-    disk:
-      name: zoommind-data
-      mountPath: /data
-      sizeGB: 1
+    plan: free
     envVars:
       - key: DATABASE_URL
-        value: sqlite:////data/app.db
+        value: sqlite:///./app.db
       - key: ZOOMMIND_LLM_PROVIDER
         value: openai-compatible
       - key: ZOOMMIND_LLM_API_KEY
