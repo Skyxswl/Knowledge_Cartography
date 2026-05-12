@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: zoommind
+    runtime: docker
+    plan: starter
+    disk:
+      name: zoommind-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////data/app.db
+      - key: ZOOMMIND_LLM_PROVIDER
+        value: openai-compatible
+      - key: ZOOMMIND_LLM_API_KEY
+        sync: false
+      - key: ZOOMMIND_LLM_BASE_URL
+        value: https://api.minimaxi.com/v1
+      - key: ZOOMMIND_LLM_MODEL
+        value: MiniMax-M2
+      - key: ZOOMMIND_LLM_TIMEOUT_SECONDS
+        value: "60"
+      - key: ZOOMMIND_LLM_TEMPERATURE
+        value: "1.0"
+      - key: ZOOMMIND_LLM_MAX_TOKENS
+        value: "700"
+      - key: ZOOMMIND_LLM_REASONING_SPLIT
+        value: "true"

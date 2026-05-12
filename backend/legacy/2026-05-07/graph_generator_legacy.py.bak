@@ -1,0 +1,196 @@
+"""
+Knowledge graph generator (mock version for local demo).
+
+Generates a centre node + N layers of child nodes for a given topic.
+All positions are computed with spherical/spiral coordinates so Three.js
+can render them directly without extra layout work.
+"""
+import math
+import uuid
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from backend.models import Edge, Node
+
+# ── topic → subtopic template (demo only, labelled as sample) ─────────────────
+_TOPIC_TEMPLATES: dict[str, list[str]] = {
+    "细胞生物学": ["细胞膜", "细胞核", "线粒体", "内质网", "高尔基体"],
+    "机器学习": ["监督学习", "无监督学习", "强化学习", "神经网络", "特征工程"],
+    "中国近代史": ["鸦片战争", "太平天国", "洋务运动", "戊戌变法", "辛亥革命"],
+    "量子力学": ["波粒二象性", "薛定谔方程", "量子纠缠", "不确定性原理", "量子态"],
+    "经济学基础": ["供需关系", "边际效用", "市场均衡", "货币政策", "博弈论"],
+}
+
+_LAYER2_TEMPLATES: dict[str, list[str]] = {
+    "细胞膜": ["磷脂双分子层", "膜蛋白", "选择透过性"],
+    "细胞核": ["DNA", "染色体", "核膜"],
+    "线粒体": ["ATP合成", "有氧呼吸", "线粒体基质"],
+    "内质网": ["粗面内质网", "滑面内质网", "蛋白质加工"],
+    "高尔基体": ["囊泡运输", "蛋白质修饰", "细胞分泌"],
+    "监督学习": ["分类", "回归", "损失函数"],
+    "无监督学习": ["聚类", "降维", "主成分分析"],
+    "强化学习": ["奖励机制", "策略函数", "Q-learning"],
+    "神经网络": ["激活函数", "反向传播", "过拟合"],
+    "特征工程": ["特征选择", "归一化", "缺失值处理"],
+}
+
+
+def _layer1_names(topic: str) -> list[str]:
+    if topic in _TOPIC_TEMPLATES:
+        return _TOPIC_TEMPLATES[topic]
+    # generic fallback
+    return [
+        f"{topic}—基础概念",
+        f"{topic}—核心原理",
+        f"{topic}—主要分支",
+        f"{topic}—应用场景",
+        f"{topic}—历史发展",
+    ]
+
+
+def _layer2_names(parent_name: str, index: int) -> list[str]:
+    if parent_name in _LAYER2_TEMPLATES:
+        return _LAYER2_TEMPLATES[parent_name]
+    return [
+        f"{parent_name}·要点{index * 3 + 1}",
+        f"{parent_name}·要点{index * 3 + 2}",
+        f"{parent_name}·要点{index * 3 + 3}",
+    ]
+
+
+# ── position helpers ───────────────────────────────────────────────────────────
+
+def _sphere_positions(n: int, radius: float) -> list[tuple[float, float, float]]:
+    """Evenly distribute n points on a sphere surface (Fibonacci lattice)."""
+    positions = []
+    golden = math.pi * (3.0 - math.sqrt(5.0))
+    for i in range(n):
+        y = 1.0 - (i / max(n - 1, 1)) * 2.0
+        r = math.sqrt(max(1.0 - y * y, 0.0))
+        theta = golden * i
+        x = math.cos(theta) * r * radius
+        z = math.sin(theta) * r * radius
+        positions.append((x, y * radius, z))
+    return positions
+
+
+def _child_positions(
+    parent: tuple[float, float, float],
+    n: int,
+    radius: float,
+) -> list[tuple[float, float, float]]:
+    """Distribute n children around a parent node."""
+    px, py, pz = parent
+    positions = []
+    for i in range(n):
+        angle = (2 * math.pi / n) * i
+        x = px + math.cos(angle) * radius
+        y = py + 0.5
+        z = pz + math.sin(angle) * radius
+        positions.append((x, y, z))
+    return positions
+
+
+# ── main entry ────────────────────────────────────────────────────────────────
+
+def generate_graph(
+    topic: str,
+    session_id: str,
+    db: Session,
+) -> tuple[list[Node], list[Edge]]:
+    """
+    Generate a 2-layer knowledge graph for *topic*, persist to DB,
+    and return (nodes, edges) lists.
+    """
+    nodes: list[Node] = []
+    edges: list[Edge] = []
+    now = datetime.utcnow()
+
+    # ── centre node (layer 0) ─────────────────────────────────────────────────
+    centre_id = str(uuid.uuid4())
+    centre = Node(
+        node_id=centre_id,
+        session_id=session_id,
+        name=topic,
+        layer="0",
+        parent_id=None,
+        is_lit=False,
+        lit_at=None,
+        position_x=0.0,
+        position_y=0.0,
+        position_z=0.0,
+    )
+    db.add(centre)
+    nodes.append(centre)
+
+    # ── layer 1 nodes ─────────────────────────────────────────────────────────
+    l1_names = _layer1_names(topic)
+    l1_positions = _sphere_positions(len(l1_names), radius=4.0)
+    l1_nodes: list[Node] = []
+
+    for i, name in enumerate(l1_names):
+        x, y, z = l1_positions[i]
+        node_id = str(uuid.uuid4())
+        node = Node(
+            node_id=node_id,
+            session_id=session_id,
+            name=name,
+            layer="1",
+            parent_id=centre_id,
+            is_lit=False,
+            lit_at=None,
+            position_x=x,
+            position_y=y,
+            position_z=z,
+        )
+        db.add(node)
+        nodes.append(node)
+        l1_nodes.append(node)
+
+        edge = Edge(
+            edge_id=str(uuid.uuid4()),
+            session_id=session_id,
+            source_node_id=centre_id,
+            target_node_id=node_id,
+        )
+        db.add(edge)
+        edges.append(edge)
+
+    # ── layer 2 nodes ─────────────────────────────────────────────────────────
+    for i, l1_node in enumerate(l1_nodes):
+        l2_names = _layer2_names(l1_node.name, i)
+        l2_positions = _child_positions(
+            (l1_node.position_x, l1_node.position_y, l1_node.position_z),
+            n=len(l2_names),
+            radius=2.0,
+        )
+        for j, name in enumerate(l2_names):
+            x, y, z = l2_positions[j]
+            node_id = str(uuid.uuid4())
+            node = Node(
+                node_id=node_id,
+                session_id=session_id,
+                name=name,
+                layer="2",
+                parent_id=l1_node.node_id,
+                is_lit=False,
+                lit_at=None,
+                position_x=x,
+                position_y=y,
+                position_z=z,
+            )
+            db.add(node)
+            nodes.append(node)
+
+            edge = Edge(
+                edge_id=str(uuid.uuid4()),
+                session_id=session_id,
+                source_node_id=l1_node.node_id,
+                target_node_id=node_id,
+            )
+            db.add(edge)
+            edges.append(edge)
+
+    db.commit()
+    return nodes, edges

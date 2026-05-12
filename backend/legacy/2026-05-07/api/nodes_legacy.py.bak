@@ -1,0 +1,94 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session as DBSession
+
+from backend.database import get_db
+from backend.models import Node, Session as SessionModel, Turn, TurnNodeMatch
+from backend.schemas import NodeSummaryResponse
+
+router = APIRouter(prefix="/api/sessions", tags=["nodes"])
+
+_SUMMARY_MAX_CHARS = 300
+
+
+@router.get(
+    "/{session_id}/nodes/{node_id}/summary",
+    response_model=NodeSummaryResponse,
+)
+def get_node_summary(
+    session_id: str,
+    node_id: str,
+    db: DBSession = Depends(get_db),
+) -> NodeSummaryResponse:
+    # verify session
+    session = db.query(SessionModel).filter(
+        SessionModel.session_id == session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # verify node belongs to session
+    node = db.query(Node).filter(
+        Node.node_id == node_id,
+        Node.session_id == session_id,
+    ).first()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # find all TurnNodeMatch records for this node
+    matches = (
+        db.query(TurnNodeMatch)
+        .filter(TurnNodeMatch.node_id == node_id)
+        .order_by(TurnNodeMatch.confidence.desc())
+        .all()
+    )
+
+    if not matches:
+        return NodeSummaryResponse(
+            node_id=node_id,
+            name=node.name,
+            summary="",
+            source_turn_ids=[],
+        )
+
+    # collect source turns (deduplicated, keep order by confidence)
+    seen_turn_ids: set[str] = set()
+    source_turn_ids: list[str] = []
+    for m in matches:
+        if m.turn_id not in seen_turn_ids:
+            seen_turn_ids.add(m.turn_id)
+            source_turn_ids.append(m.turn_id)
+
+    # fetch turn contents
+    turns = (
+        db.query(Turn)
+        .filter(Turn.turn_id.in_(source_turn_ids))
+        .order_by(Turn.timestamp.asc())
+        .all()
+    )
+
+    # build summary: concat user turns only (user questions + context)
+    # then truncate to _SUMMARY_MAX_CHARS
+    parts: list[str] = []
+    for turn in turns:
+        if turn.speaker == "user":
+            parts.append(f"问：{turn.content}")
+        else:
+            # include AI reply but trim mock prefix
+            content = turn.content
+            if content.startswith("【Mock AI】"):
+                content = content[len("【Mock AI】"):]
+            parts.append(f"答：{content}")
+
+    raw_summary = " | ".join(parts)
+    summary = (
+        raw_summary[:_SUMMARY_MAX_CHARS] + "…"
+        if len(raw_summary) > _SUMMARY_MAX_CHARS
+        else raw_summary
+    )
+
+    return NodeSummaryResponse(
+        node_id=node_id,
+        name=node.name,
+        summary=summary,
+        source_turn_ids=source_turn_ids,
+    )

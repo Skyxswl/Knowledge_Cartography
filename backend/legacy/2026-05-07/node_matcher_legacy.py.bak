@@ -1,0 +1,67 @@
+"""
+Keyword-based node matcher (demo version, no external NLP dependencies).
+
+Strategy
+--------
+1. For each node, check if the node's name (or any of its substrings of
+   length >= 2) appears in the input text.
+2. Confidence = length_of_longest_match / len(node.name), capped at 1.0.
+3. Nodes whose name is fully contained in the text get confidence 1.0.
+4. Returns only matches above MIN_CONFIDENCE threshold.
+"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.models import Node
+
+MIN_CONFIDENCE: float = 0.4
+MIN_SUBSTR_LEN: int = 2  # ignore single-char matches
+
+
+def _longest_match(text: str, name: str) -> int:
+    """Return the length of the longest substring of *name* found in *text*."""
+    best = 0
+    n = len(name)
+    for length in range(n, MIN_SUBSTR_LEN - 1, -1):
+        for start in range(n - length + 1):
+            substr = name[start : start + length]
+            if substr in text:
+                best = max(best, length)
+                break  # found longest starting at some offset, try shorter
+        if best == n:
+            break  # full match, no need to search further
+    return best
+
+
+def match_nodes(
+    text: str,
+    nodes: list["Node"],
+) -> list[tuple[str, float]]:
+    """
+    Match *text* against a list of Node ORM objects.
+
+    Returns
+    -------
+    List of (node_id, confidence) tuples, sorted by confidence descending.
+    Only matches with confidence >= MIN_CONFIDENCE are returned.
+    The centre node (layer == "0") is excluded — it is always the topic itself.
+    """
+    results: list[tuple[str, float]] = []
+
+    for node in nodes:
+        if node.layer == "0":
+            continue  # skip centre node
+
+        name = node.name
+        match_len = _longest_match(text, name)
+        if match_len < MIN_SUBSTR_LEN:
+            continue
+
+        confidence = round(match_len / max(len(name), 1), 3)
+        if confidence >= MIN_CONFIDENCE:
+            results.append((node.node_id, confidence))
+
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results

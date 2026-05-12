@@ -1,0 +1,88 @@
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+
+class NodeState(BaseModel):
+    node_id: str
+    name: str
+    layer: str
+    parent_id: Optional[str] = None
+    is_lit: bool
+    lit_at: Optional[datetime] = None
+    position_x: float
+    position_y: float
+    position_z: float
+
+    model_config = {"from_attributes": True}
+
+
+# ── Edge ──────────────────────────────────────────────────────────────────────
+
+class EdgeState(BaseModel):
+    edge_id: str
+    source_node_id: str
+    target_node_id: str
+
+    model_config = {"from_attributes": True}
+
+
+# ── Graph ─────────────────────────────────────────────────────────────────────
+
+class GraphData(BaseModel):
+    nodes: list[NodeState]
+    edges: list[EdgeState]
+
+
+# ── Session ───────────────────────────────────────────────────────────────────
+
+class SessionCreate(BaseModel):
+    topic: str
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    topic: str
+    graph: GraphData
+    lit_count: int
+    total_count: int
+    coverage_percent: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Turn ──────────────────────────────────────────────────────────────────────
+
+class TurnCreate(BaseModel):
+    content: str
+    speaker: str  # "user"
+
+
+class TurnItem(BaseModel):
+    turn_id: str
+    session_id: str
+    speaker: str
+    content: str
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TurnResponse(BaseModel):
+    turn_id: str
+    ai_reply: str
+    matched_node_ids: list[str]
+    updated_nodes: list[NodeState]
+
+
+# ── Node Summary ──────────────────────────────────────────────────────────────
+
+class NodeSummaryResponse(BaseModel):
+    node_id: str
+    name: str
+    summary: str
+    source_turn_ids: list[str]

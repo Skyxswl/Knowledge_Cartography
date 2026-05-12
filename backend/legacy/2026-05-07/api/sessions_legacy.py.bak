@@ -1,0 +1,61 @@
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from backend.database import get_db
+from backend.graph_generator import generate_graph
+from backend.models import Session as SessionModel
+from backend.schemas import GraphData, SessionCreate, SessionResponse
+
+router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+
+
+def _build_session_response(session: SessionModel, db: Session) -> SessionResponse:
+    from backend.models import Node, Edge
+    nodes = db.query(Node).filter(Node.session_id == session.session_id).all()
+    edges = db.query(Edge).filter(Edge.session_id == session.session_id).all()
+    from backend.schemas import NodeState, EdgeState
+    lit_count = sum(1 for n in nodes if n.is_lit)
+    total_count = len(nodes)
+    coverage = round(lit_count / total_count * 100, 1) if total_count else 0.0
+    return SessionResponse(
+        session_id=session.session_id,
+        topic=session.topic,
+        graph=GraphData(
+            nodes=[NodeState.model_validate(n) for n in nodes],
+            edges=[EdgeState.model_validate(e) for e in edges],
+        ),
+        lit_count=lit_count,
+        total_count=total_count,
+        coverage_percent=coverage,
+        created_at=session.created_at,
+    )
+
+
+@router.post("", response_model=SessionResponse, status_code=201)
+def create_session(body: SessionCreate, db: Session = Depends(get_db)):
+    session_id = str(uuid.uuid4())
+    session = SessionModel(
+        session_id=session_id,
+        topic=body.topic,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    generate_graph(body.topic, session_id, db)
+    return _build_session_response(session, db)
+
+
+@router.get("/{session_id}", response_model=SessionResponse)
+def get_session(session_id: str, db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    session = db.query(SessionModel).filter(
+        SessionModel.session_id == session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return _build_session_response(session, db)
