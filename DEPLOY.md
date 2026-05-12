@@ -36,8 +36,8 @@ DATABASE_URL=sqlite:///./app.db
 每轮远程测试结束后，立刻导出数据：
 
 ```text
-https://你的-render-url.onrender.com/api/export
-https://你的-render-url.onrender.com/api/export/events.csv
+https://knowledge-cartography.onrender.com/api/export
+https://knowledge-cartography.onrender.com/api/export/events.csv
 ```
 
 `/api/export` 返回完整 JSON，适合备份。`/api/export/events.csv` 返回行为日志 CSV，适合快速分析。

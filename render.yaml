@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: zoommind
+    name: knowledge-cartography
     runtime: docker
     plan: free
     envVars:
