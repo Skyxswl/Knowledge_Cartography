@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import axios from 'axios'
-import { expandNode, getNodeQuestions, getNodeTrace, getSession, logExperimentEvent } from '@/api/sessions'
+import { getNodeQuestions, getNodeTrace, getSession, logExperimentEvent } from '@/api/sessions'
 import { createTurn, listTurns } from '@/api/turns'
 import type { QuestionCategory, SuggestedQuestion } from '@/api/types'
 import type { ChatMessage } from '@/components/chat/types'
@@ -188,7 +188,6 @@ function LearningPageInner() {
 
   async function handleNodeSelect(nodeId: string, source: 'graph' | 'blindspot' = 'graph') {
     if (!sessionId) return
-    const selectedNode = state.nodes.find((node) => node.node_id === nodeId)
     const blindspot = state.blindspots.find((item) => item.node_id === nodeId)
     if (source === 'blindspot') {
       recordGraphEvent('GI-B', {
@@ -200,24 +199,8 @@ function LearningPageInner() {
       })
     }
     dispatch({ type: 'SELECT_NODE', payload: nodeId })
-    if (selectedNode?.state === 'unlit') {
-      try {
-        const expanded = await expandNode(sessionId, nodeId)
-        dispatch({ type: 'APPLY_EXPAND', payload: expanded })
-        recordGraphEvent('GI-E', {
-          nodeId,
-          metadata: {
-            source,
-            revealed_count: expanded.revealed_nodes.length,
-          },
-        })
-      } catch {
-        recordGraphEvent('GI-E', {
-          nodeId,
-          metadata: { source, error: 'expand_failed' },
-        })
-      }
-    }
+    // NOTE: Clicking a node should NOT activate it - only user mentioning
+    // the concept in chat should activate nodes. Click just shows details.
     try {
       const trace = await getNodeTrace(sessionId, nodeId)
       dispatch({ type: 'SET_TRACE_TURNS', payload: trace.turns })

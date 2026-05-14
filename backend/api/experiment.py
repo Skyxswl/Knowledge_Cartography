@@ -180,6 +180,16 @@ def create_graph_snapshot(
     return _snapshot_to_item(_create_snapshot(session_id, body.label, db))
 
 
+@router.get("/{session_id}/snapshots/create", response_model=GraphSnapshotItem)
+def create_graph_snapshot_from_browser(
+    session_id: str,
+    label: str | None = "end",
+    db: DBSession = Depends(get_db),
+) -> GraphSnapshotItem:
+    _ensure_session(session_id, db)
+    return _snapshot_to_item(_create_snapshot(session_id, label, db))
+
+
 @router.get("/{session_id}/snapshots", response_model=list[GraphSnapshotItem])
 def list_graph_snapshots(session_id: str, db: DBSession = Depends(get_db)) -> list[GraphSnapshotItem]:
     _ensure_session(session_id, db)

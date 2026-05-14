@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 
 from backend.database import get_db
@@ -33,8 +33,15 @@ def _json_object(raw: str | None) -> Any:
         return raw
 
 
+def _utf8_json_response(payload: dict[str, Any]) -> Response:
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False),
+        media_type="application/json; charset=utf-8",
+    )
+
+
 @router.get("")
-def export_all_data(db: DBSession = Depends(get_db)) -> dict[str, Any]:
+def export_all_data(db: DBSession = Depends(get_db)) -> Response:
     sessions = db.query(SessionModel).order_by(SessionModel.created_at.asc()).all()
     nodes = db.query(Node).order_by(Node.session_id.asc(), Node.layer.asc(), Node.name.asc()).all()
     edges = db.query(Edge).order_by(Edge.session_id.asc(), Edge.edge_id.asc()).all()
@@ -43,7 +50,7 @@ def export_all_data(db: DBSession = Depends(get_db)) -> dict[str, Any]:
     events = db.query(ExperimentEvent).order_by(ExperimentEvent.session_id.asc(), ExperimentEvent.created_at.asc()).all()
     snapshots = db.query(GraphSnapshot).order_by(GraphSnapshot.session_id.asc(), GraphSnapshot.created_at.asc()).all()
 
-    return {
+    payload = {
         "exported_at": datetime.utcnow().isoformat(),
         "sessions": [
             _row(session, ["session_id", "topic", "created_at", "updated_at"])
@@ -124,12 +131,14 @@ def export_all_data(db: DBSession = Depends(get_db)) -> dict[str, Any]:
             for snapshot in snapshots
         ],
     }
+    return _utf8_json_response(payload)
 
 
 @router.get("/events.csv")
 def export_events_csv(db: DBSession = Depends(get_db)) -> StreamingResponse:
     events = db.query(ExperimentEvent).order_by(ExperimentEvent.session_id.asc(), ExperimentEvent.created_at.asc()).all()
     output = io.StringIO()
+    output.write("\ufeff")
     fieldnames = [
         "event_id",
         "session_id",

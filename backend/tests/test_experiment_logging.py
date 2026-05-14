@@ -117,6 +117,22 @@ class ExperimentLoggingTest(unittest.TestCase):
         self.assertEqual(state_events[0]["metadata"]["old_state"], "unlit")
         self.assertEqual(state_events[0]["metadata"]["new_state"], "activated")
 
+    def test_export_declares_utf8_and_preserves_chinese(self):
+        response = self.client.get("/api/export")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("charset=utf-8", response.headers["content-type"])
+        self.assertIn("行为经济学入门", response.text)
+        self.assertIn("锚定效应", response.text)
+
+    def test_browser_snapshot_endpoint_creates_snapshot(self):
+        response = self.client.get(f"/api/sessions/{self.session_id}/snapshots/create?label=end")
+
+        self.assertEqual(response.status_code, 200)
+        snapshot = response.json()
+        self.assertEqual(snapshot["label"], "end")
+        self.assertEqual(snapshot["session_id"], self.session_id)
+
 
 if __name__ == "__main__":
     unittest.main()
