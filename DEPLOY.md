@@ -33,7 +33,25 @@ DATABASE_URL=sqlite:///./app.db
 
 远程实验日志、状态快照、对话和图谱会写入服务内的 SQLite 文件。免费 Render 不提供 persistent disk，服务重启、休眠唤醒或重新部署后数据可能丢失。
 
-每轮远程测试结束后，立刻导出数据：
+每轮远程测试结束后，打开一次最终导出链接。这个链接会先创建 `end` 快照，再下载该 session 的完整 JSON：
+
+```text
+https://knowledge-cartography.onrender.com/api/export/session/{session_id}/final
+```
+
+例如学习页地址是：
+
+```text
+https://knowledge-cartography.onrender.com/learn/abc-123
+```
+
+最终导出地址就是：
+
+```text
+https://knowledge-cartography.onrender.com/api/export/session/abc-123/final
+```
+
+调试时也可以导出全量数据或单独行为日志：
 
 ```text
 https://knowledge-cartography.onrender.com/api/export

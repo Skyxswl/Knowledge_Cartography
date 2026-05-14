@@ -133,6 +133,19 @@ class ExperimentLoggingTest(unittest.TestCase):
         self.assertEqual(snapshot["label"], "end")
         self.assertEqual(snapshot["session_id"], self.session_id)
 
+    def test_final_export_creates_snapshot_and_downloads_session_json(self):
+        response = self.client.get(f"/api/export/session/{self.session_id}/final")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("charset=utf-8", response.headers["content-type"])
+        self.assertIn("attachment;", response.headers["content-disposition"])
+        data = response.json()
+        self.assertEqual(data["session_id"], self.session_id)
+        self.assertEqual(len(data["sessions"]), 1)
+        self.assertEqual(data["sessions"][0]["topic"], "行为经济学入门")
+        self.assertEqual(len(data["graph_snapshots"]), 1)
+        self.assertEqual(data["graph_snapshots"][0]["label"], "end")
+
 
 if __name__ == "__main__":
     unittest.main()
