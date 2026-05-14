@@ -54,3 +54,20 @@ export async function createGraphSnapshot(sessionId: string, label?: string): Pr
   })
   return data
 }
+
+export async function downloadFinalSessionExport(sessionId: string): Promise<void> {
+  const response = await apiClient.get<Blob>(`/api/export/session/${sessionId}/final`, {
+    responseType: 'blob',
+  })
+  const disposition = response.headers['content-disposition']
+  const match = typeof disposition === 'string' ? disposition.match(/filename="([^"]+)"/) : null
+  const filename = match?.[1] ?? `knowledge-cartography-${sessionId}-end.json`
+  const href = window.URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(href)
+}

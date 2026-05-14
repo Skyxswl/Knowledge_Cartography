@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import axios from 'axios'
-import { getNodeQuestions, getNodeTrace, getSession, logExperimentEvent } from '@/api/sessions'
+import { downloadFinalSessionExport, getNodeQuestions, getNodeTrace, getSession, logExperimentEvent } from '@/api/sessions'
 import { createTurn, listTurns } from '@/api/turns'
 import type { QuestionCategory, SuggestedQuestion } from '@/api/types'
 import type { ChatMessage } from '@/components/chat/types'
@@ -58,6 +58,7 @@ function LearningPageInner() {
   const [pendingQuestionPrompt, setPendingQuestionPrompt] = useState<string | null>(null)
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   function recordGraphEvent(
     eventType: string,
@@ -259,6 +260,19 @@ function LearningPageInner() {
     })
   }
 
+  async function handleFinalExport() {
+    if (!sessionId || isExporting) return
+    setIsExporting(true)
+    try {
+      await downloadFinalSessionExport(sessionId)
+    } catch (error) {
+      console.error('Failed to download final export', error)
+      window.alert('数据下载失败，请稍后重试或联系实验员。')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[#f7fbff] md:flex-row">
       <div className="flex h-[42%] min-h-[290px] flex-shrink-0 flex-col border-b border-slate-200 bg-white md:h-auto md:w-[40%] md:border-b-0 md:border-r">
@@ -276,9 +290,19 @@ function LearningPageInner() {
         <ChatInput ref={chatInputRef} onSend={handleSend} disabled={!graphLoaded} busy={isSending} />
       </div>
       <div className="flex min-h-0 flex-1 flex-col bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] p-3 md:p-4">
-        <div className="mb-2 px-1 md:mb-3 md:px-2">
-          <div className="text-xs uppercase tracking-[0.22em] text-slate-400">Concept Field</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">认知图谱</div>
+        <div className="mb-2 flex items-center justify-between gap-3 px-1 md:mb-3 md:px-2">
+          <div>
+            <div className="text-xs uppercase tracking-[0.22em] text-slate-400">Concept Field</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">认知图谱</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleFinalExport()}
+            disabled={!graphLoaded || isExporting}
+            className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-cyan-400 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isExporting ? '正在打包数据…' : '下载本次测试数据'}
+          </button>
         </div>
         <div className="min-h-[200px] flex-[4] md:min-h-[190px]">
           <ErrorBoundary>
